@@ -1,9 +1,10 @@
 import logging
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional
 
 import numpy as np
 import pandas as pd
 import streamlit as st
+import umap
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.palettes import Cividis256 as Pallete
 from bokeh.plotting import figure
@@ -17,8 +18,8 @@ SEED = 0
 
 
 @st.cache(show_spinner=False, allow_output_mutation=True)
-def load_model():
-    embedder = "distiluse-base-multilingual-cased-v1"
+def load_model(model_name):
+    embedder = model_name
     return SentenceTransformer(embedder)
 
 
@@ -37,6 +38,11 @@ def get_tsne_embeddings(
 ) -> np.ndarray:
     tsne = TSNE(perplexity=perplexity, n_components=n_components, init=init, n_iter=n_iter, random_state=random_state)
     return tsne.fit_transform(embeddings)
+
+
+def get_umap_embeddings(embeddings: np.ndarray) -> np.ndarray:
+    umap_model = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, random_state=SEED)
+    return umap_model.fit_transform(embeddings)
 
 
 def draw_interactive_scatter_plot(
@@ -62,7 +68,14 @@ def draw_interactive_scatter_plot(
     return p
 
 
-def generate_plot(uploaded_file: st.uploaded_file_manager.UploadedFile, text_column: str, label_column: str, sample: Optional[int], model: SentenceTransformer):
+def generate_plot(
+    uploaded_file: st.uploaded_file_manager.UploadedFile,
+    text_column: str,
+    label_column: str,
+    sample: Optional[int],
+    dimensionality_reduction_function: Callable,
+    model: SentenceTransformer,
+):
     logger.info("Loading dataset in memory")
     extension = uploaded_file.name.split(".")[-1]
     df = pd.read_csv(uploaded_file, sep="\t" if extension == "tsv" else ",")
@@ -77,11 +90,11 @@ def generate_plot(uploaded_file: st.uploaded_file_manager.UploadedFile, text_col
     embeddings = embed_text(df[text_column].values.tolist(), model)
     logger.info("Encoding labels")
     encoded_labels = encode_labels(df[label_column])
-    logger.info("Running t-SNE")
-    tsne_embeddings = get_tsne_embeddings(embeddings)
+    logger.info("Running dimensionality reduction")
+    embeddings_2d = dimensionality_reduction_function(embeddings)
     logger.info("Generating figure")
     plot = draw_interactive_scatter_plot(
-        df[text_column].values, tsne_embeddings[:, 0], tsne_embeddings[:, 1], encoded_labels.values, df[label_column].values, text_column, label_column
+        df[text_column].values, embeddings_2d[:, 0], embeddings_2d[:, 1], encoded_labels.values, df[label_column].values, text_column, label_column
     )
     return plot
 
@@ -92,10 +105,13 @@ uploaded_file = st.file_uploader("Choose an csv/tsv file...", type=["csv", "tsv"
 text_column = st.text_input("Text column name", "text")
 label_column = st.text_input("Numerical/categorical column name (ignore if not applicable)", "label")
 sample = st.number_input("Maximum number of documents to use", 1, 100000, 1000)
-model = load_model()
+dimensionality_reduction = st.selectbox("Dimensionality Reduction algorithm", ["UMAP", "t-SNE"], 0)
+model_name = st.selectbox("Sentence embedding model", ["distiluse-base-multilingual-cased-v1", "all-mpnet-base-v2"], 0)
+model = load_model(model_name)
+dimensionality_reduction_function = get_umap_embeddings if dimensionality_reduction == "UMAP" else get_tsne_embeddings
 
 if uploaded_file:
-    plot = generate_plot(uploaded_file, text_column, label_column, sample, model)
+    plot = generate_plot(uploaded_file, text_column, label_column, sample, dimensionality_reduction_function, model)
     logger.info("Displaying plot")
     st.bokeh_chart(plot)
     logger.info("Done")
