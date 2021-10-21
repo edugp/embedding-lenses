@@ -45,7 +45,10 @@ def draw_interactive_scatter_plot(
     # Normalize values to range between 0-255, to assign a color for each value
     max_value = values.max()
     min_value = values.min()
-    values_color = ((values - min_value) / (max_value - min_value) * 255).round().astype(int).astype(str)
+    if max_value - min_value == 0:
+        values_color = np.ones(len(values))
+    else:
+        values_color = ((values - min_value) / (max_value - min_value) * 255).round().astype(int).astype(str)
     values_color_set = sorted(values_color)
 
     values_list = values.astype(str).tolist()
@@ -59,9 +62,12 @@ def draw_interactive_scatter_plot(
     return p
 
 
-def generate_plot(tsv: st.uploaded_file_manager.UploadedFile, text_column: str, label_column: str, sample: Optional[int], model: SentenceTransformer):
+def generate_plot(uploaded_file: st.uploaded_file_manager.UploadedFile, text_column: str, label_column: str, sample: Optional[int], model: SentenceTransformer):
     logger.info("Loading dataset in memory")
-    df = pd.read_csv(tsv, sep="\t")
+    extension = uploaded_file.name.split(".")[-1]
+    df = pd.read_csv(uploaded_file, sep="\t" if extension == "tsv" else ",")
+    if text_column not in df.columns:
+        raise ValueError("The specified column name doesn't exist")
     if label_column not in df.columns:
         df[label_column] = 0
     df = df.dropna(subset=[text_column, label_column])
