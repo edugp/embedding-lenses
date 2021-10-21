@@ -81,6 +81,7 @@ def generate_plot(tsv: st.uploaded_file_manager.UploadedFile, text_column: str, 
 
 
 st.title("Embedding Lenses")
+st.write("Visualize text embeddings in 2D using colors for continuous or categorical labels.")
 uploaded_file = st.file_uploader("Choose an csv/tsv file...", type=["csv", "tsv"])
 text_column = st.text_input("Text column name", "text")
 label_column = st.text_input("Numerical/categorical column name (ignore if not applicable)", "label")
