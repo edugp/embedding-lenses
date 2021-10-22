@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Callable, List, Optional
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -9,6 +10,7 @@ from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.palettes import Cividis256 as Pallete
 from bokeh.plotting import figure
 from bokeh.transform import factor_cmap
+from datasets import load_dataset
 from sentence_transformers import SentenceTransformer
 from sklearn.manifold import TSNE
 
@@ -68,8 +70,23 @@ def draw_interactive_scatter_plot(
     return p
 
 
+def uploaded_file_to_dataframe(uploaded_file: st.uploaded_file_manager.UploadedFile) -> pd.DataFrame:
+    extension = uploaded_file.name.split(".")[-1]
+    return pd.read_csv(uploaded_file, sep="\t" if extension == "tsv" else ",")
+
+
+def hub_dataset_to_dataframe(path: str, name: str, split: str, text_column: str, label_column: str, sample: int) -> pd.DataFrame:
+    load_dataset_fn = partial(load_dataset, path=path)
+    if name:
+        load_dataset_fn = partial(load_dataset_fn, name=name)
+    if split:
+        load_dataset_fn = partial(load_dataset_fn, split=split)
+    dataset = load_dataset_fn().shuffle()[:sample]
+    return pd.DataFrame(dataset)
+
+
 def generate_plot(
-    uploaded_file: st.uploaded_file_manager.UploadedFile,
+    df: pd.DataFrame,
     text_column: str,
     label_column: str,
     sample: Optional[int],
@@ -77,8 +94,6 @@ def generate_plot(
     model: SentenceTransformer,
 ):
     logger.info("Loading dataset in memory")
-    extension = uploaded_file.name.split(".")[-1]
-    df = pd.read_csv(uploaded_file, sep="\t" if extension == "tsv" else ",")
     if text_column not in df.columns:
         raise ValueError("The specified column name doesn't exist")
     if label_column not in df.columns:
@@ -102,6 +117,15 @@ def generate_plot(
 st.title("Embedding Lenses")
 st.write("Visualize text embeddings in 2D using colors for continuous or categorical labels.")
 uploaded_file = st.file_uploader("Choose an csv/tsv file...", type=["csv", "tsv"])
+st.write("Alternatively, select a dataset from the hub")
+col1, col2, col3 = st.beta_columns(3)
+with col1:
+    hub_dataset = st.text_input("Dataset name", "ag_news")
+with col2:
+    hub_dataset_config = st.text_input("Dataset configuration", "")
+with col3:
+    hub_dataset_split = st.text_input("Dataset split", "train")
+
 text_column = st.text_input("Text column name", "text")
 label_column = st.text_input("Numerical/categorical column name (ignore if not applicable)", "label")
 sample = st.number_input("Maximum number of documents to use", 1, 100000, 1000)
@@ -110,8 +134,13 @@ model_name = st.selectbox("Sentence embedding model", ["distiluse-base-multiling
 model = load_model(model_name)
 dimensionality_reduction_function = get_umap_embeddings if dimensionality_reduction == "UMAP" else get_tsne_embeddings
 
-if uploaded_file:
-    plot = generate_plot(uploaded_file, text_column, label_column, sample, dimensionality_reduction_function, model)
+if uploaded_file or hub_dataset:
+    if uploaded_file:
+        df = uploaded_file_to_dataframe(uploaded_file)
+    else:
+        df = hub_dataset_to_dataframe(hub_dataset, hub_dataset_config, hub_dataset_split, text_column, label_column, sample)
+    plot = generate_plot(df, text_column, label_column, sample, dimensionality_reduction_function, model)
+    print(type(plot))
     logger.info("Displaying plot")
     st.bokeh_chart(plot)
     logger.info("Done")
