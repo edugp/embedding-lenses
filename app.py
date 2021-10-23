@@ -122,7 +122,7 @@ def generate_plot(
 st.title("Embedding Lenses")
 st.write("Visualize text embeddings in 2D using colors for continuous or categorical labels.")
 uploaded_file = st.file_uploader("Choose an csv/tsv file...", type=["csv", "tsv"])
-st.write("Alternatively, select a dataset from the hub")
+st.write("Alternatively, select a dataset from the [hub](https://huggingface.co/datasets)")
 col1, col2, col3 = st.columns(3)
 with col1:
     hub_dataset = st.text_input("Dataset name", "ag_news")
