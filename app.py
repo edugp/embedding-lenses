@@ -1,6 +1,6 @@
 import logging
-from typing import Any, Callable, List, Optional
 from functools import partial
+from typing import Callable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -8,7 +8,7 @@ import streamlit as st
 import umap
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.palettes import Cividis256 as Pallete
-from bokeh.plotting import figure
+from bokeh.plotting import Figure, figure
 from bokeh.transform import factor_cmap
 from datasets import load_dataset
 from sentence_transformers import SentenceTransformer
@@ -20,7 +20,7 @@ SEED = 0
 
 
 @st.cache(show_spinner=False, allow_output_mutation=True)
-def load_model(model_name):
+def load_model(model_name: str) -> SentenceTransformer:
     embedder = model_name
     return SentenceTransformer(embedder)
 
@@ -49,7 +49,7 @@ def get_umap_embeddings(embeddings: np.ndarray) -> np.ndarray:
 
 def draw_interactive_scatter_plot(
     texts: np.ndarray, xs: np.ndarray, ys: np.ndarray, values: np.ndarray, labels: np.ndarray, text_column: str, label_column: str
-) -> Any:
+) -> Figure:
     # Normalize values to range between 0-255, to assign a color for each value
     max_value = values.max()
     min_value = values.min()
@@ -65,8 +65,13 @@ def draw_interactive_scatter_plot(
 
     source = ColumnDataSource(data=dict(x=xs, y=ys, text=texts, label=values_list, original_label=labels_list))
     hover = HoverTool(tooltips=[(text_column, "@text{safe}"), (label_column, "@original_label")])
-    p = figure(plot_width=800, plot_height=800, tools=[hover], title="Embedding Lenses")
+    p = figure(plot_width=800, plot_height=800, tools=[hover])
     p.circle("x", "y", size=10, source=source, fill_color=factor_cmap("label", palette=[Pallete[int(id_)] for id_ in values_color_set], factors=values_set))
+
+    p.axis.visible = False
+    p.xgrid.grid_line_color = None
+    p.ygrid.grid_line_color = None
+    p.toolbar.logo = None
     return p
 
 
@@ -75,13 +80,13 @@ def uploaded_file_to_dataframe(uploaded_file: st.uploaded_file_manager.UploadedF
     return pd.read_csv(uploaded_file, sep="\t" if extension == "tsv" else ",")
 
 
-def hub_dataset_to_dataframe(path: str, name: str, split: str, text_column: str, label_column: str, sample: int) -> pd.DataFrame:
+def hub_dataset_to_dataframe(path: str, name: str, split: str, sample: int) -> pd.DataFrame:
     load_dataset_fn = partial(load_dataset, path=path)
     if name:
         load_dataset_fn = partial(load_dataset_fn, name=name)
     if split:
         load_dataset_fn = partial(load_dataset_fn, split=split)
-    dataset = load_dataset_fn().shuffle(random_state=SEED)[:sample]
+    dataset = load_dataset_fn().shuffle(seed=SEED)[:sample]
     return pd.DataFrame(dataset)
 
 
@@ -92,10 +97,10 @@ def generate_plot(
     sample: Optional[int],
     dimensionality_reduction_function: Callable,
     model: SentenceTransformer,
-):
+) -> Figure:
     logger.info("Loading dataset in memory")
     if text_column not in df.columns:
-        raise ValueError("The specified column name doesn't exist")
+        raise ValueError(f"The specified column name doesn't exist. Columns available: {df.columns.values}")
     if label_column not in df.columns:
         df[label_column] = 0
     df = df.dropna(subset=[text_column, label_column])
@@ -118,7 +123,7 @@ st.title("Embedding Lenses")
 st.write("Visualize text embeddings in 2D using colors for continuous or categorical labels.")
 uploaded_file = st.file_uploader("Choose an csv/tsv file...", type=["csv", "tsv"])
 st.write("Alternatively, select a dataset from the hub")
-col1, col2, col3 = st.beta_columns(3)
+col1, col2, col3 = st.columns(3)
 with col1:
     hub_dataset = st.text_input("Dataset name", "ag_news")
 with col2:
@@ -138,9 +143,8 @@ if uploaded_file or hub_dataset:
     if uploaded_file:
         df = uploaded_file_to_dataframe(uploaded_file)
     else:
-        df = hub_dataset_to_dataframe(hub_dataset, hub_dataset_config, hub_dataset_split, text_column, label_column, sample)
+        df = hub_dataset_to_dataframe(hub_dataset, hub_dataset_config, hub_dataset_split, sample)
     plot = generate_plot(df, text_column, label_column, sample, dimensionality_reduction_function, model)
-    print(type(plot))
     logger.info("Displaying plot")
     st.bokeh_chart(plot)
     logger.info("Done")
