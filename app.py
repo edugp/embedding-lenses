@@ -81,7 +81,7 @@ def hub_dataset_to_dataframe(path: str, name: str, split: str, text_column: str,
         load_dataset_fn = partial(load_dataset_fn, name=name)
     if split:
         load_dataset_fn = partial(load_dataset_fn, split=split)
-    dataset = load_dataset_fn().shuffle()[:sample]
+    dataset = load_dataset_fn().shuffle(random_state=SEED)[:sample]
     return pd.DataFrame(dataset)
 
 
