@@ -98,7 +98,6 @@ def generate_plot(
     dimensionality_reduction_function: Callable,
     model: SentenceTransformer,
 ) -> Figure:
-    logger.info("Loading dataset in memory")
     if text_column not in df.columns:
         raise ValueError(f"The specified column name doesn't exist. Columns available: {df.columns.values}")
     if label_column not in df.columns:
@@ -106,12 +105,12 @@ def generate_plot(
     df = df.dropna(subset=[text_column, label_column])
     if sample:
         df = df.sample(min(sample, df.shape[0]), random_state=SEED)
-    logger.info("Embedding sentences")
-    embeddings = embed_text(df[text_column].values.tolist(), model)
+    with st.spinner(text='Embedding text...'):
+        embeddings = embed_text(df[text_column].values.tolist(), model)
     logger.info("Encoding labels")
     encoded_labels = encode_labels(df[label_column])
-    logger.info("Running dimensionality reduction")
-    embeddings_2d = dimensionality_reduction_function(embeddings)
+    with st.spinner("Reducing dimensionality..."):
+        embeddings_2d = dimensionality_reduction_function(embeddings)
     logger.info("Generating figure")
     plot = draw_interactive_scatter_plot(
         df[text_column].values, embeddings_2d[:, 0], embeddings_2d[:, 1], encoded_labels.values, df[label_column].values, text_column, label_column
@@ -136,14 +135,16 @@ label_column = st.text_input("Numerical/categorical column name (ignore if not a
 sample = st.number_input("Maximum number of documents to use", 1, 100000, 1000)
 dimensionality_reduction = st.selectbox("Dimensionality Reduction algorithm", ["UMAP", "t-SNE"], 0)
 model_name = st.selectbox("Sentence embedding model", ["distiluse-base-multilingual-cased-v1", "all-mpnet-base-v2"], 0)
-model = load_model(model_name)
+with st.spinner(text="Loading model..."):
+    model = load_model(model_name)
 dimensionality_reduction_function = get_umap_embeddings if dimensionality_reduction == "UMAP" else get_tsne_embeddings
 
 if uploaded_file or hub_dataset:
-    if uploaded_file:
-        df = uploaded_file_to_dataframe(uploaded_file)
-    else:
-        df = hub_dataset_to_dataframe(hub_dataset, hub_dataset_config, hub_dataset_split, sample)
+    with st.spinner("Loading dataset..."):
+        if uploaded_file:
+            df = uploaded_file_to_dataframe(uploaded_file)
+        else:
+            df = hub_dataset_to_dataframe(hub_dataset, hub_dataset_config, hub_dataset_split, sample)
     plot = generate_plot(df, text_column, label_column, sample, dimensionality_reduction_function, model)
     logger.info("Displaying plot")
     st.bokeh_chart(plot)
