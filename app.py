@@ -16,6 +16,8 @@ from sklearn.manifold import TSNE
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+EMBEDDING_MODELS = ["distiluse-base-multilingual-cased-v1", "all-mpnet-base-v2", "flax-sentence-embeddings/all_datasets_v3_mpnet-base"]
+DIMENSIONALITY_REDUCTION_ALGORITHMS = ["UMAP", "t-SNE"]
 SEED = 0
 
 
@@ -105,7 +107,7 @@ def generate_plot(
     df = df.dropna(subset=[text_column, label_column])
     if sample:
         df = df.sample(min(sample, df.shape[0]), random_state=SEED)
-    with st.spinner(text='Embedding text...'):
+    with st.spinner(text="Embedding text..."):
         embeddings = embed_text(df[text_column].values.tolist(), model)
     logger.info("Encoding labels")
     encoded_labels = encode_labels(df[label_column])
@@ -133,8 +135,8 @@ with col3:
 text_column = st.text_input("Text column name", "text")
 label_column = st.text_input("Numerical/categorical column name (ignore if not applicable)", "label")
 sample = st.number_input("Maximum number of documents to use", 1, 100000, 1000)
-dimensionality_reduction = st.selectbox("Dimensionality Reduction algorithm", ["UMAP", "t-SNE"], 0)
-model_name = st.selectbox("Sentence embedding model", ["distiluse-base-multilingual-cased-v1", "all-mpnet-base-v2"], 0)
+dimensionality_reduction = st.selectbox("Dimensionality Reduction algorithm", DIMENSIONALITY_REDUCTION_ALGORITHMS, 0)
+model_name = st.selectbox("Sentence embedding model", EMBEDDING_MODELS, 0)
 with st.spinner(text="Loading model..."):
     model = load_model(model_name)
 dimensionality_reduction_function = get_umap_embeddings if dimensionality_reduction == "UMAP" else get_tsne_embeddings
