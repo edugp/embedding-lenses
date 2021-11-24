@@ -1,30 +1,34 @@
+from typing import Dict
+
 import numpy as np
 from bokeh.models import ColumnDataSource, HoverTool
-from bokeh.palettes import Cividis256 as Pallete
+from bokeh.palettes import Cividis256, Palette
 from bokeh.plotting import Figure, figure
 from bokeh.transform import factor_cmap
 
 
 def draw_interactive_scatter_plot(
-    texts: np.ndarray, xs: np.ndarray, ys: np.ndarray, values: np.ndarray, labels: np.ndarray, text_column: str, label_column: str
+    hover_fields: Dict[str, np.ndarray], xs: np.ndarray, ys: np.ndarray, values: np.ndarray, palette: Palette = Cividis256
 ) -> Figure:
     # Normalize values to range between 0-255, to assign a color for each value
     max_value = values.max()
     min_value = values.min()
     if max_value - min_value == 0:
-        values_color = np.ones(len(values))
+        values_color = np.ones(len(values)).astype(int).astype(str)
     else:
         values_color = ((values - min_value) / (max_value - min_value) * 255).round().astype(int).astype(str)
     values_color_set = sorted(values_color)
 
     values_list = values.astype(str).tolist()
     values_set = sorted(values_list)
-    labels_list = labels.astype(str).tolist()
 
-    source = ColumnDataSource(data=dict(x=xs, y=ys, text=texts, label=values_list, original_label=labels_list))
-    hover = HoverTool(tooltips=[(text_column, "@text{safe}"), (label_column, "@original_label")])
+    data = {"_x_": xs, "_y_": ys, "_label_color_": values_list}
+    hover_data = {field: values.astype(str).tolist() for field, values in hover_fields.items()}
+    data.update(hover_data)
+    source = ColumnDataSource(data=data)
+    hover = HoverTool(tooltips=[(field, "@%s{safe}" % field) for field in hover_data.keys()])
     p = figure(plot_width=800, plot_height=800, tools=[hover])
-    p.circle("x", "y", size=10, source=source, fill_color=factor_cmap("label", palette=[Pallete[int(id_)] for id_ in values_color_set], factors=values_set))
+    p.circle("_x_", "_y_", size=10, source=source, fill_color=factor_cmap("_label_color_", palette=[palette[int(id_)] for id_ in values_color_set], factors=values_set))
 
     p.axis.visible = False
     p.xgrid.grid_line_color = None

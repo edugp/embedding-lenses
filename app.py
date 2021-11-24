@@ -30,8 +30,10 @@ def generate_plot(
 ) -> Figure:
     if text_column not in df.columns:
         raise ValueError(f"The specified column name doesn't exist. Columns available: {df.columns.values}")
+    label_column_exists = True
     if label_column not in df.columns:
         df[label_column] = 0
+        label_column_exists = False
     df = df.dropna(subset=[text_column, label_column])
     if sample:
         df = df.sample(min(sample, df.shape[0]), random_state=SEED)
@@ -42,8 +44,14 @@ def generate_plot(
     with st.spinner("Reducing dimensionality..."):
         embeddings_2d = dimensionality_reduction_function(embeddings)
     logger.info("Generating figure")
+    hover_data = {text_column: df[text_column].values}
+    if label_column_exists:
+        hover_data[label_column] = df[label_column].values
     plot = draw_interactive_scatter_plot(
-        df[text_column].values, embeddings_2d[:, 0], embeddings_2d[:, 1], encoded_labels.values, df[label_column].values, text_column, label_column
+        hover_data,
+        embeddings_2d[:, 0],
+        embeddings_2d[:, 1],
+        encoded_labels.values,
     )
     return plot
 
