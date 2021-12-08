@@ -10,13 +10,9 @@ from bokeh.transform import factor_cmap
 def draw_interactive_scatter_plot(
     hover_fields: Dict[str, np.ndarray], xs: np.ndarray, ys: np.ndarray, values: np.ndarray, palette: Palette = Cividis256
 ) -> Figure:
-    # Normalize values to range between 0-255, to assign a color for each value
-    max_value = values.max()
-    min_value = values.min()
-    if max_value - min_value == 0:
-        values_color = np.ones(len(values)).astype(int).astype(str)
-    else:
-        values_color = ((values - min_value) / (max_value - min_value) * 255).round()
+    # Assign a color for each value based on its 256-quantile (since color palette has 256 values)
+    quantiles = np.quantile(values, np.arange(0, 1, 1 / 255))
+    values_color = np.searchsorted(quantiles, values, side="right")
     values_color_set = np.sort(values_color).astype(int).astype(str)
 
     values_list = values.astype(str).tolist()
