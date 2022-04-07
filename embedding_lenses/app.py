@@ -56,36 +56,41 @@ def generate_plot(
     return plot
 
 
-st.title("Embedding Lenses")
-st.write("Visualize text embeddings in 2D using colors for continuous or categorical labels.")
-uploaded_file = st.file_uploader("Choose an csv/tsv file...", type=["csv", "tsv"])
-st.write("Alternatively, select a dataset from the [hub](https://huggingface.co/datasets)")
-col1, col2, col3 = st.columns(3)
-with col1:
-    hub_dataset = st.text_input("Dataset name", "ag_news")
-with col2:
-    hub_dataset_config = st.text_input("Dataset configuration", "")
-with col3:
-    hub_dataset_split = st.text_input("Dataset split", "train")
+def app():
+    st.title("Embedding Lenses")
+    st.write("Visualize text embeddings in 2D using colors for continuous or categorical labels.")
+    uploaded_file = st.file_uploader("Choose an csv/tsv file...", type=["csv", "tsv"])
+    st.write("Alternatively, select a dataset from the [hub](https://huggingface.co/datasets)")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        hub_dataset = st.text_input("Dataset name", "ag_news")
+    with col2:
+        hub_dataset_config = st.text_input("Dataset configuration", "")
+    with col3:
+        hub_dataset_split = st.text_input("Dataset split", "train")
 
-text_column = st.text_input("Text column name", "text")
-label_column = st.text_input("Numerical/categorical column name (ignore if not applicable)", "label")
-sample = st.number_input("Maximum number of documents to use", 1, 100000, 1000)
-dimensionality_reduction = st.selectbox("Dimensionality Reduction algorithm", DIMENSIONALITY_REDUCTION_ALGORITHMS, 0)
-model_name = st.selectbox("Sentence embedding model", EMBEDDING_MODELS, 0)
-with st.spinner(text="Loading model..."):
-    model = load_model(model_name)
-dimensionality_reduction_function = (
-    partial(get_umap_embeddings, random_state=SEED) if dimensionality_reduction == "UMAP" else partial(get_tsne_embeddings, random_state=SEED)
-)
+    text_column = st.text_input("Text column name", "text")
+    label_column = st.text_input("Numerical/categorical column name (ignore if not applicable)", "label")
+    sample = st.number_input("Maximum number of documents to use", 1, 100000, 1000)
+    dimensionality_reduction = st.selectbox("Dimensionality Reduction algorithm", DIMENSIONALITY_REDUCTION_ALGORITHMS, 0)
+    model_name = st.selectbox("Sentence embedding model", EMBEDDING_MODELS, 0)
+    with st.spinner(text="Loading model..."):
+        model = load_model(model_name)
+    dimensionality_reduction_function = (
+        partial(get_umap_embeddings, random_state=SEED) if dimensionality_reduction == "UMAP" else partial(get_tsne_embeddings, random_state=SEED)
+    )
 
-if uploaded_file or hub_dataset:
-    with st.spinner("Loading dataset..."):
-        if uploaded_file:
-            df = uploaded_file_to_dataframe(uploaded_file)
-        else:
-            df = hub_dataset_to_dataframe(hub_dataset, hub_dataset_config, hub_dataset_split, sample, seed=SEED)
-    plot = generate_plot(df, text_column, label_column, sample, dimensionality_reduction_function, model)
-    logger.info("Displaying plot")
-    st.bokeh_chart(plot)
-    logger.info("Done")
+    if uploaded_file or hub_dataset:
+        with st.spinner("Loading dataset..."):
+            if uploaded_file:
+                df = uploaded_file_to_dataframe(uploaded_file)
+            else:
+                df = hub_dataset_to_dataframe(hub_dataset, hub_dataset_config, hub_dataset_split, sample, seed=SEED)
+        plot = generate_plot(df, text_column, label_column, sample, dimensionality_reduction_function, model)
+        logger.info("Displaying plot")
+        st.bokeh_chart(plot)
+        logger.info("Done")
+
+
+if __name__ == "__main__":
+    app()
